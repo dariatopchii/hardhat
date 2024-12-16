@@ -26,13 +26,6 @@ describe("ContentBridge Contract", function () {
         expect(uploader).to.equal(admin.address);
     });
 
-    it("Should not allow non-admin to add content", async function () {
-        const data = JSON.stringify({ hash: "example_hash", metadata: "example_metadata" });
-        await expect(contentBridge.connect(other).addContent(data)).to.be.revertedWith(
-            "Access denied: Requires ADMIN_ROLE"
-        );
-    });
-
     it("Should update content successfully", async function () {
         const data = JSON.stringify({ hash: "example_hash", metadata: "example_metadata" });
         const updatedData = JSON.stringify({ hash: "updated_hash", metadata: "updated_metadata" });

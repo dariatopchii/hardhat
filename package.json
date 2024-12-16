@@ -16,6 +16,9 @@
   "dependencies": {
     "@openzeppelin/contracts": "^5.1.0",
     "ethers": "^6.13.4",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "form-data": "^4.0.1",
+    "ipfs-http-client": "^50.1.2",
+    "node-fetch": "^3.3.2"
   }
 }
