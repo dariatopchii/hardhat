@@ -33,7 +33,7 @@ const testApiCall = async (method, endpoint, data = null) => {
     const invalidData = "";
 
     try {
-        const addContentResponse = await testApiCall('post', '/webhook', { data: validData });
+        const addContentResponse = await testApiCall('post', '/add-content', { data: validData });
         assert.strictEqual(addContentResponse.status, 200, "Add Content should succeed");
         console.log("  Positive Case Passed:", addContentResponse.data);
     } catch (error) {
@@ -41,7 +41,7 @@ const testApiCall = async (method, endpoint, data = null) => {
     }
 
     try {
-        const addContentInvalidResponse = await testApiCall('post', '/webhook', { data: invalidData });
+        const addContentInvalidResponse = await testApiCall('post', '/add-content', { data: invalidData });
         assert.strictEqual(addContentInvalidResponse.status, 400, "Add Content with invalid data should fail");
         console.log("  Negative Case Passed:", addContentInvalidResponse.data);
     } catch (error) {
@@ -51,7 +51,7 @@ const testApiCall = async (method, endpoint, data = null) => {
     // 2. Test Get All Contents
     console.log("Test Get All Contents:");
     try {
-        const getAllResponse = await testApiCall('get', '/contents');
+        const getAllResponse = await testApiCall('get', '/get-all-contents');
         assert.strictEqual(getAllResponse.status, 200, "Get All Contents should succeed");
         assert.ok(Array.isArray(getAllResponse.data), "Response should be an array");
         console.log("  Response Data:", getAllResponse.data);
@@ -66,11 +66,11 @@ const testApiCall = async (method, endpoint, data = null) => {
 
     try {
         // Проверяем, существует ли контент перед обновлением
-        const checkResponse = await testApiCall('get', `/contents`);
+        const checkResponse = await testApiCall('get', `/get-all-contents`);
         const existingContent = checkResponse.data.find(item => item.id === updateId);
         assert.ok(existingContent, `Content ID ${updateId} does not exist for update`);
 
-        const updateResponse = await testApiCall('put', `/content/${updateId}`, { data: newData });
+        const updateResponse = await testApiCall('put', `/update-content/${updateId}`, { data: newData });
         assert.strictEqual(updateResponse.status, 200, "Update Content should succeed");
         console.log("  Update Response:", updateResponse.data);
     } catch (error) {
@@ -79,7 +79,7 @@ const testApiCall = async (method, endpoint, data = null) => {
 
     try {
         // Negative test for Update Content
-        const updateInvalidResponse = await testApiCall('put', `/content/9999`, { data: newData });
+        const updateInvalidResponse = await testApiCall('put', `/update-content/9999`, { data: newData });
         assert.strictEqual(updateInvalidResponse.status, 400, "Update with invalid ID should fail");
         console.log("  Negative Case Passed:", updateInvalidResponse.data);
     } catch (error) {
@@ -91,11 +91,11 @@ const testApiCall = async (method, endpoint, data = null) => {
     const removeId = 1; // Assuming ID 1 exists for testing
     try {
         // Проверяем, существует ли контент перед удалением
-        const checkResponse = await testApiCall('get', '/contents');
+        const checkResponse = await testApiCall('get', '/get-all-contents');
         const contentExists = checkResponse.data.some(item => item.id === removeId);
         assert.ok(contentExists, `Content ID ${removeId} does not exist for removal`);
 
-        const removeResponse = await testApiCall('delete', `/content/${removeId}`);
+        const removeResponse = await testApiCall('delete', `/remove-content/${removeId}`);
         assert.strictEqual(removeResponse.status, 200, "Remove Content should succeed");
         console.log("  Remove Response:", removeResponse.data);
     } catch (error) {
@@ -104,7 +104,7 @@ const testApiCall = async (method, endpoint, data = null) => {
 
     try {
         // Negative test for Remove Content
-        const removeInvalidResponse = await testApiCall('delete', `/content/9999`);
+        const removeInvalidResponse = await testApiCall('delete', `/remove-content/9999`);
         assert.strictEqual(removeInvalidResponse.status, 400, "Remove with invalid ID should fail");
         console.log("  Negative Case Passed:", removeInvalidResponse.data);
     } catch (error) {
@@ -116,7 +116,7 @@ const testApiCall = async (method, endpoint, data = null) => {
 
     try {
         // Example of a new API: sort by uploader
-        const sortResponse = await testApiCall('get', '/contents?sort=uploader');
+        const sortResponse = await testApiCall('get', '/get-all-contents?sort=uploader');
         assert.strictEqual(sortResponse.status, 200, "Sorting contents should succeed");
         console.log("  Sorted Data:", sortResponse.data);
     } catch (error) {
@@ -126,7 +126,7 @@ const testApiCall = async (method, endpoint, data = null) => {
     try {
         // Example of a new API: search by ID
         const searchId = 1; // Assuming this ID exists
-        const searchResponse = await testApiCall('get', `/content/${searchId}`);
+        const searchResponse = await testApiCall('get', `/get-content/${searchId}`);
         assert.strictEqual(searchResponse.status, 200, "Search by ID should succeed");
         console.log("  Search Result:", searchResponse.data);
     } catch (error) {
