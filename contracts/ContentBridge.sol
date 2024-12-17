@@ -11,13 +11,14 @@ contract ContentBridge is AccessControl {
     }
 
     mapping(uint256 => Content) public contents;
+    mapping(uint256 => uint256) public strapiToBlockchain; // Маппинг Strapi ID -> Blockchain ID
     uint256 public contentCount;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    event ContentAdded(uint256 indexed id, string data, address indexed uploader);
-    event ContentUpdated(uint256 indexed id, string data);
-    event ContentRemoved(uint256 indexed id);
+    event ContentAdded(uint256 indexed id, uint256 strapiId, string data, address indexed uploader);
+    event ContentUpdated(uint256 indexed id, uint256 strapiId, string data);
+    event ContentRemoved(uint256 indexed id, uint256 strapiId);
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -29,33 +30,43 @@ contract ContentBridge is AccessControl {
         _;
     }
 
-    // Добавление новой записи
-    function addContent(string memory _data) public onlyAdmin {
+    // Добавление новой записи с использованием Strapi ID
+    function addContent(uint256 _strapiId, string memory _data) public onlyAdmin {
         require(bytes(_data).length > 0, "Invalid content"); // Проверка на пустую строку
+        require(strapiToBlockchain[_strapiId] == 0 && _strapiId != 0, "Strapi ID already exists"); // Проверка уникальности Strapi ID
+
         contents[contentCount] = Content({
             data: _data,
             uploader: msg.sender,
             exists: true
         });
-        emit ContentAdded(contentCount, _data, msg.sender);
+
+        strapiToBlockchain[_strapiId] = contentCount; // Связываем Strapi ID с Blockchain ID
+        emit ContentAdded(contentCount, _strapiId, _data, msg.sender);
+
         contentCount++;
     }
 
-    // Обновление существующей записи
-    function updateContent(uint256 _id, string memory _data) public onlyAdmin {
-        require(contents[_id].exists, "Content ID does not exist");
+    // Обновление записи с использованием Strapi ID
+    function updateContent(uint256 _strapiId, string memory _data) public onlyAdmin {
+        uint256 blockchainId = strapiToBlockchain[_strapiId];
+        require(contents[blockchainId].exists, "Content ID does not exist");
         require(bytes(_data).length > 0, "Invalid content"); // Проверка на пустую строку
-        contents[_id].data = _data;
 
-        emit ContentUpdated(_id, _data);
+        contents[blockchainId].data = _data;
+
+        emit ContentUpdated(blockchainId, _strapiId, _data);
     }
 
-    // Удаление записи
-    function removeContent(uint256 _id) public onlyAdmin {
-        require(contents[_id].exists, "Content ID does not exist");
-        delete contents[_id];
+    // Удаление записи с использованием Strapi ID
+    function removeContent(uint256 _strapiId) public onlyAdmin {
+        uint256 blockchainId = strapiToBlockchain[_strapiId];
+        require(contents[blockchainId].exists, "Content ID does not exist");
 
-        emit ContentRemoved(_id);
+        delete contents[blockchainId];
+        delete strapiToBlockchain[_strapiId];
+
+        emit ContentRemoved(blockchainId, _strapiId);
     }
 
     // Получение всех записей
@@ -74,10 +85,11 @@ contract ContentBridge is AccessControl {
         return (allData, allUploaders);
     }
 
-    // Получение одной записи по ID
-    function getContent(uint256 _id) public view returns (string memory, address) {
-        require(contents[_id].exists, "Content ID does not exist");
-        Content memory content = contents[_id];
+    // Получение записи по Strapi ID
+    function getContent(uint256 _strapiId) public view returns (string memory, address) {
+        uint256 blockchainId = strapiToBlockchain[_strapiId];
+        require(contents[blockchainId].exists, "Content ID does not exist");
+        Content memory content = contents[blockchainId];
         return (content.data, content.uploader);
     }
 

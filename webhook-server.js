@@ -1,9 +1,12 @@
 // Import necessary modules
+require('dotenv').config(); // Load environment variables from .env
 const express = require('express');
 const bodyParser = require('body-parser');
 const ethers = require('ethers');
 const crypto = require('crypto');
-const axios = require('axios'); // Replacing ipfs-http-client with axios
+const axios = require('axios');
+const fs = require('fs'); // For reading ABI file
+const path = require('path'); // For handling file paths
 
 // Initialize Express app
 const app = express();
@@ -12,455 +15,40 @@ const port = 3000;
 // Middleware to parse JSON
 app.use(bodyParser.json());
 
+// Load sensitive variables from .env
+const privateKey = process.env.PRIVATE_KEY;
+const contractAddress = process.env.CONTRACT_ADDRESS;
+const abiPath = process.env.CONTRACT_ABI_PATH;
+
+// Validate environment variables
+if (!privateKey || !contractAddress || !abiPath) {
+  console.error('Error: PRIVATE_KEY, CONTRACT_ADDRESS, or CONTRACT_ABI_PATH is not set in .env');
+  process.exit(1);
+}
+
+// Load ABI from JSON file
+let contractABI;
+try {
+  const abiData = fs.readFileSync(path.resolve(abiPath), 'utf8');
+  const parsedABI = JSON.parse(abiData);
+  contractABI = parsedABI.abi; // Extract `abi` from the JSON file
+} catch (error) {
+  console.error(`Error reading ABI file at ${abiPath}:`, error.message);
+  process.exit(1);
+}
+
 // Configure Ethereum provider and contract
-const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
-const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'; // Replace with your private key
+const providerUrl = process.env.PROVIDER_URL;
+if (!providerUrl) {
+  console.error('Error: PROVIDER_URL is not set in .env');
+  process.exit(1);
+}
+
+const provider = new ethers.JsonRpcProvider(providerUrl);
+
 const wallet = new ethers.Wallet(privateKey, provider);
-const contractAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3'; // Replace with your deployed contract address
-const contractABI =  [
-    {
-      "inputs": [],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "inputs": [],
-      "name": "AccessControlBadConfirmation",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "neededRole",
-          "type": "bytes32"
-        }
-      ],
-      "name": "AccessControlUnauthorizedAccount",
-      "type": "error"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "data",
-          "type": "string"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "uploader",
-          "type": "address"
-        }
-      ],
-      "name": "ContentAdded",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        }
-      ],
-      "name": "ContentRemoved",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "data",
-          "type": "string"
-        }
-      ],
-      "name": "ContentUpdated",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "indexed": true,
-          "internalType": "bytes32",
-          "name": "previousAdminRole",
-          "type": "bytes32"
-        },
-        {
-          "indexed": true,
-          "internalType": "bytes32",
-          "name": "newAdminRole",
-          "type": "bytes32"
-        }
-      ],
-      "name": "RoleAdminChanged",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "sender",
-          "type": "address"
-        }
-      ],
-      "name": "RoleGranted",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "sender",
-          "type": "address"
-        }
-      ],
-      "name": "RoleRevoked",
-      "type": "event"
-    },
-    {
-      "inputs": [],
-      "name": "ADMIN_ROLE",
-      "outputs": [
-        {
-          "internalType": "bytes32",
-          "name": "",
-          "type": "bytes32"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "DEFAULT_ADMIN_ROLE",
-      "outputs": [
-        {
-          "internalType": "bytes32",
-          "name": "",
-          "type": "bytes32"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "string",
-          "name": "_data",
-          "type": "string"
-        }
-      ],
-      "name": "addContent",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "contentCount",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "name": "contents",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "data",
-          "type": "string"
-        },
-        {
-          "internalType": "address",
-          "name": "uploader",
-          "type": "address"
-        },
-        {
-          "internalType": "bool",
-          "name": "exists",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "getAllContents",
-      "outputs": [
-        {
-          "internalType": "string[]",
-          "name": "",
-          "type": "string[]"
-        },
-        {
-          "internalType": "address[]",
-          "name": "",
-          "type": "address[]"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_id",
-          "type": "uint256"
-        }
-      ],
-      "name": "getContent",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "",
-          "type": "string"
-        },
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "getContentCount",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        }
-      ],
-      "name": "getRoleAdmin",
-      "outputs": [
-        {
-          "internalType": "bytes32",
-          "name": "",
-          "type": "bytes32"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        }
-      ],
-      "name": "grantRole",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        }
-      ],
-      "name": "hasRole",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_id",
-          "type": "uint256"
-        }
-      ],
-      "name": "removeContent",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "address",
-          "name": "callerConfirmation",
-          "type": "address"
-        }
-      ],
-      "name": "renounceRole",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        }
-      ],
-      "name": "revokeRole",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes4",
-          "name": "interfaceId",
-          "type": "bytes4"
-        }
-      ],
-      "name": "supportsInterface",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_id",
-          "type": "uint256"
-        },
-        {
-          "internalType": "string",
-          "name": "_data",
-          "type": "string"
-        }
-      ],
-      "name": "updateContent",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    }
-  ];
 const contract = new ethers.Contract(contractAddress, contractABI, wallet);
+
 
 // Function to hash data using SHA256
 const hashData = (data) => {
@@ -517,58 +105,154 @@ app.post('/webhook', async (req, res) => {
     res.status(500).send('Internal server error');
   }
 });
+ 
 
-// Endpoint to get all contents
-app.get('/contents', async (req, res) => {
+// Функція для валідації payload
+const validatePayload = (payload) => {
+  if (!payload || typeof payload !== 'object') return false;
+
+  const { event, entry } = payload;
+  if (!event || !entry || typeof entry !== 'object') return false;
+
+  // Обов'язкові поля для entry
+  const requiredFields = ['id', 'documentId', 'hash', 'metadata'];
+  return requiredFields.every((field) => field in entry);
+};
+
+// Кеш для IPFS
+const cache = new Map();
+
+// Отримання даних з IPFS з використанням кешу
+const getCachedContentFromIPFS = async (cid) => {
+  if (cache.has(cid)) {
+    console.log(`Cache hit for CID: ${cid}`);
+    return cache.get(cid);
+  }
+
+  console.log(`Cache miss for CID: ${cid}. Fetching from IPFS...`);
   try {
-    const [contents, uploaders] = await contract.getAllContents();
-    const result = contents.map((content, index) => ({
-      id: index,
-      content: content,
-      uploader: uploaders[index]
-    }));
-    res.status(200).json(result);
+    const response = await axios.get(`http://127.0.0.1:5001/api/v0/cat?arg=${cid}`);
+    const content = response.data;
+
+    // Зберігаємо контент у кеш
+    cache.set(cid, content);
+    return content;
   } catch (error) {
-    console.error('Error fetching contents:', error);
-    res.status(500).send('Internal server error');
+    console.error('Error fetching content from IPFS:', error);
+    throw error;
+  }
+};
+
+// Очищення кешу для CID
+const clearCacheForCID = (cid) => {
+  if (cache.has(cid)) {
+    console.log(`Clearing cache for CID: ${cid}`);
+    cache.delete(cid);
+  }
+};
+
+// Додатковий ендпоінт для Strapi вебхуків
+app.post('/strapi-webhook', async (req, res) => {
+  try {
+    const payload = req.body;
+
+    // Валідація структури payload
+    if (!validatePayload(payload)) {
+      console.error('Invalid webhook payload:', payload);
+      return res.status(400).send({ error: 'Invalid payload structure' });
+    }
+
+    const { event, entry } = payload;
+
+    console.log('=== Incoming Webhook ===');
+    console.log(`Event: ${event}`);
+    console.log('Entry:', entry);
+
+    if (event === 'entry.create') {
+      try {
+        const data = JSON.stringify(entry);
+        console.log(`Adding content to IPFS...`);
+
+        // Завантаження даних до IPFS
+        const cid = await uploadToIPFS(data);
+        cache.set(cid, data); // Кешуємо контент
+
+        console.log(`Adding content to blockchain with Strapi ID ${entry.id}...`);
+        const tx = await contract.addContent(entry.id, cid);
+        await tx.wait();
+
+        console.log(`Content added to blockchain: CID=${cid}, TX=${tx.hash}`);
+        res.status(200).send({ message: 'Content added successfully', ipfsHash: cid });
+      } catch (error) {
+        console.error('Error adding content to blockchain:', error);
+        res.status(500).send({ error: 'Failed to add content to blockchain', details: error.message });
+      }
+    } else if (event === 'entry.update') {
+      try {
+        const data = JSON.stringify(entry);
+        console.log(`Updating content with Strapi ID ${entry.id} in IPFS...`);
+
+        // Завантаження оновлених даних до IPFS
+        const cid = await uploadToIPFS(data);
+        cache.set(cid, data); // Оновлюємо кеш
+
+        console.log(`Updating content in blockchain with Strapi ID ${entry.id}...`);
+        const tx = await contract.updateContent(entry.id, cid);
+        await tx.wait();
+
+        console.log(`Content updated in blockchain: CID=${cid}, TX=${tx.hash}`);
+        res.status(200).send({ message: 'Content updated successfully', ipfsHash: cid });
+      } catch (error) {
+        console.error('Error updating content in blockchain:', error);
+        res.status(500).send({
+          error: 'Failed to update content in blockchain',
+          details: error.reason || error.message || 'Unknown error',
+        });
+      }
+    } else if (event === 'entry.delete') {
+      try {
+        console.log(`Removing content with Strapi ID ${entry.id} from blockchain...`);
+
+        // Видаляємо кешовані дані для цього CID
+        const cachedContent = [...cache.entries()].find(([_, value]) => JSON.parse(value).id === entry.id);
+        if (cachedContent) clearCacheForCID(cachedContent[0]);
+
+        // Видалення запису в контракті
+        const tx = await contract.removeContent(entry.id);
+        console.log(`Transaction sent: ${tx.hash}`);
+        await tx.wait();
+
+        console.log(`Content removed from blockchain: Strapi ID=${entry.id}, TX=${tx.hash}`);
+        res.status(200).send({ message: 'Content removed successfully', id: entry.id });
+      } catch (error) {
+        console.error('Error removing content from blockchain:', error);
+        res.status(500).send({
+          error: 'Failed to remove content from blockchain',
+          details: error.reason || error.message || 'Unknown error',
+        });
+      }
+    } else {
+      console.warn(`Unknown Strapi event: ${event}`);
+      res.status(400).send({ error: `Unknown event type: ${event}` });
+    }
+  } catch (error) {
+    console.error('Unexpected error processing Strapi webhook:', error);
+    res.status(500).send({ error: 'Unexpected server error', details: error.message });
   }
 });
 
-// Endpoint to update content by ID
-app.put('/content/:id', async (req, res) => {
+// Endpoint to read content using cache
+app.get('/content/:cid', async (req, res) => {
+  const { cid } = req.params;
+
   try {
-    const { id } = req.params;
-    const { data } = req.body;
-    if (!data) return res.status(400).send('No content provided');
-
-    // Upload to IPFS
-    const cid = await uploadToIPFS(data);
-    console.log('Updated Data CID:', cid);
-
-    const tx = await contract.updateContent(id, cid);
-    await tx.wait();
-
-    res.status(200).send({ message: 'Content updated on blockchain', ipfsHash: cid });
+    const content = await getCachedContentFromIPFS(cid);
+    res.status(200).send({ cid, content });
   } catch (error) {
-    console.error('Error updating content:', error);
-    res.status(500).send('Internal server error');
+    res.status(500).send({ error: 'Failed to fetch content', details: error.message });
   }
 });
 
-// Endpoint to remove content by ID
-app.delete('/content/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const tx = await contract.removeContent(id);
-    await tx.wait();
-
-    res.status(200).send({ message: 'Content removed from blockchain', id });
-  } catch (error) {
-    console.error('Error removing content:', error);
-    res.status(500).send('Internal server error');
-  }
-});
 
 // Start the server
 app.listen(port, () => {
